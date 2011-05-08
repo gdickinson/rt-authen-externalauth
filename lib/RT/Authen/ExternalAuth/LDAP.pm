@@ -30,14 +30,10 @@ sub GetAuth {
     my $ldap = _GetBoundLdapObj($config);
     return 0 unless ($ldap);
 
-    $filter = '(&(' . 
-                                        $attr_map->{'Name'} . 
-                                        '=' . 
-                                        $username . 
-                                        ')' . 
-                                        $filter . 
-                                        ')'
-    ;
+    $filter = '(&'
+        .'('.  $attr_map->{'Name'} .  '=' .  $username .  ')' . 
+        $filter
+    .')';
 
     my $ldap_msg = PerformSearch(
         $ldap,
@@ -164,15 +160,7 @@ sub CanonicalizeUserInfo {
     
     unless ( $ldap_msg ) {
         # If we didn't get at LEAST a partial result, just die now.
-        $ldap_msg = $ldap->unbind();
-        if ($ldap_msg->code != LDAP_SUCCESS) {
-            $RT::Logger->critical(  (caller(0))[3],
-                                    ": Could not unbind: ", 
-                                    ldap_error_name($ldap_msg->code), 
-                                    $ldap_msg->code);
-        }
-        undef $ldap;
-        undef $ldap_msg;
+        Unbind( $ldap );
         return ($found, %params);
     } else {
         # If there's only one match, we're good; more than one and
@@ -190,28 +178,11 @@ sub CanonicalizeUserInfo {
             $found = 1;
         } else {
             # Drop out to the next external information service
-            $ldap_msg = $ldap->unbind();
-            if ($ldap_msg->code != LDAP_SUCCESS) {
-                $RT::Logger->critical(  (caller(0))[3],
-                                        ": Could not unbind: ", 
-                                        ldap_error_name($ldap_msg->code), 
-                                        $ldap_msg->code);
-            }
-            undef $ldap;
-            undef $ldap_msg;
+            Unbind( $ldap );
             return ($found, %params);
         }
     }
-    $ldap_msg = $ldap->unbind();
-    if ($ldap_msg->code != LDAP_SUCCESS) {
-        $RT::Logger->critical(  (caller(0))[3],
-                                ": Could not unbind: ", 
-                                ldap_error_name($ldap_msg->code), 
-                                $ldap_msg->code);
-    }
-
-    undef $ldap;
-    undef $ldap_msg;
+    Unbind( $ldap );
 
     return ($found, %params);
 }
@@ -403,6 +374,19 @@ sub _GetBoundLdapObj {
     } else {
         return $ldap;
     }
+}
+
+sub Unbind {
+    my $ldap = shift;
+    my $res = $ldap->unbind;
+    return $res if !$res || $res->code == LDAP_SUCCESS;
+
+    $RT::Logger->error(
+        (caller(1))[3], ": Could not unbind: ", 
+        ldap_error_name($res->code), 
+        $res->code
+    );
+    return $res;
 }
 
 sub PerformSearch {
