@@ -158,29 +158,19 @@ sub CanonicalizeUserInfo {
         attrs  => \@attrs
     );
     
-    unless ( $ldap_msg ) {
-        # If we didn't get at LEAST a partial result, just die now.
-        Unbind( $ldap );
-        return ($found, %params);
-    } else {
-        # If there's only one match, we're good; more than one and
-        # we don't know which is the right one so we skip it.
-        if ($ldap_msg->count == 1) {
-            my $entry = $ldap_msg->first_entry();
-            foreach my $key (keys(%{$config->{'attr_map'}})) {
-                if ($RT::LdapAttrMap->{$key} eq 'dn') {
-                    $params{$key} = $entry->dn();
-                } else {
-                    $params{$key} = 
-                      ($entry->get_value($config->{'attr_map'}->{$key}))[0];
-                }
+    # If there's only one match, we're good; more than one and
+    # we don't know which is the right one so we skip it.
+    if ($ldap_msg && $ldap_msg->count == 1) {
+        my $entry = $ldap_msg->first_entry();
+        foreach my $key (keys(%{$config->{'attr_map'}})) {
+            if ($RT::LdapAttrMap->{$key} eq 'dn') {
+                $params{$key} = $entry->dn();
+            } else {
+                $params{$key} = 
+                  ($entry->get_value($config->{'attr_map'}->{$key}))[0];
             }
-            $found = 1;
-        } else {
-            # Drop out to the next external information service
-            Unbind( $ldap );
-            return ($found, %params);
         }
+        $found = 1;
     }
     Unbind( $ldap );
 
