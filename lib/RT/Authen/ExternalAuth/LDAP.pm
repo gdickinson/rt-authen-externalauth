@@ -108,7 +108,7 @@ sub GetAuth {
 
 sub CanonicalizeUserInfo {
     
-    my ($service, $key, $value) = @_;
+    my ($service, $key, $value, $attrs) = @_;
 
     # Load the config
     my $config = $RT::ExternalSettings->{$service};
@@ -116,9 +116,6 @@ sub CanonicalizeUserInfo {
     # Figure out what's what
     my $base            = $config->{'base'};
     my $filter          = $config->{'filter'};
-
-    # Get the list of unique attrs we need
-    my @attrs = values(%{$config->{'attr_map'}});
 
     # This is a bit confusing and probably broken. Something to revisit..
     my $filter_addition = ($key && $value) ? "(". $key . "=$value)" : "";
@@ -150,7 +147,7 @@ sub CanonicalizeUserInfo {
         $ldap,
         base   => $base,
         filter => $filter,
-        attrs  => \@attrs
+        attrs  => $attrs
     );
     
     # If there's only one match, we're good; more than one and
@@ -161,16 +158,14 @@ sub CanonicalizeUserInfo {
     }
 
     my %res;
-    my $entry = $ldap_msg->first_entry();
-    foreach my $key (keys(%{$config->{'attr_map'}})) {
-        if ($RT::LdapAttrMap->{$key} eq 'dn') {
-            $res{$key} = $entry->dn();
+    my $entry = $ldap_msg->first_entry;
+    foreach my $attr ( @$attrs ) {
+        if ( $attr eq 'dn' ) {
+            $res{ $attr } = $entry->dn;
         } else {
-            $res{$key} = 
-              ($entry->get_value($config->{'attr_map'}->{$key}))[0];
+            $res{ $attr } = ($entry->get_value( $attr ))[0];
         }
     }
-
     Unbind( $ldap );
     return (1, %res);
 }
