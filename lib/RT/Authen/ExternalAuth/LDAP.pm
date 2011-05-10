@@ -110,11 +110,6 @@ sub CanonicalizeUserInfo {
     
     my ($service, $key, $value) = @_;
 
-    my $found = 0;
-    my %params = (Name         => undef,
-                  EmailAddress => undef,
-                  RealName     => undef);
-
     # Load the config
     my $config = $RT::ExternalSettings->{$service};
    
@@ -141,7 +136,7 @@ sub CanonicalizeUserInfo {
         $RT::Logger->critical(  (caller(0))[3],
                                 "LDAP baseDN not defined");
         # Drop out to the next external information service
-        return ($found, %params);
+        return (0);
     }
 
     # Get a Net::LDAP object based on the config we provide
@@ -149,7 +144,7 @@ sub CanonicalizeUserInfo {
 
     # Jump to the next external information service if we can't get one, 
     # errors should be logged by _GetBoundLdapObj so we don't have to.
-    return ($found, %params) unless ($ldap);
+    return (0) unless ($ldap);
 
     my $ldap_msg = PerformSearch(
         $ldap,
@@ -160,21 +155,24 @@ sub CanonicalizeUserInfo {
     
     # If there's only one match, we're good; more than one and
     # we don't know which is the right one so we skip it.
-    if ($ldap_msg && $ldap_msg->count == 1) {
-        my $entry = $ldap_msg->first_entry();
-        foreach my $key (keys(%{$config->{'attr_map'}})) {
-            if ($RT::LdapAttrMap->{$key} eq 'dn') {
-                $params{$key} = $entry->dn();
-            } else {
-                $params{$key} = 
-                  ($entry->get_value($config->{'attr_map'}->{$key}))[0];
-            }
-        }
-        $found = 1;
+    unless ($ldap_msg && $ldap_msg->count == 1) {
+        Unbind( $ldap );
+        return (0);
     }
-    Unbind( $ldap );
 
-    return ($found, %params);
+    my %res;
+    my $entry = $ldap_msg->first_entry();
+    foreach my $key (keys(%{$config->{'attr_map'}})) {
+        if ($RT::LdapAttrMap->{$key} eq 'dn') {
+            $res{$key} = $entry->dn();
+        } else {
+            $res{$key} = 
+              ($entry->get_value($config->{'attr_map'}->{$key}))[0];
+        }
+    }
+
+    Unbind( $ldap );
+    return (1, %res);
 }
 
 sub UserExists {
