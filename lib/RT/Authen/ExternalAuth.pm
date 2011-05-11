@@ -438,6 +438,8 @@ sub CanonicalizeUserInfo {
     my $UserObj = shift;
     my $args    = shift;
 
+    WorkaroundAutoCreate( $UserObj, $args );
+
     my $current_value = sub {
         my $field = shift;
         return $args->{ $field } if keys %$args;
@@ -654,6 +656,22 @@ sub CanonicalizeUserInfo {
         }
         return $rv;
     };
+}
+
+sub WorkaroundAutoCreate {
+    my $user = shift;
+    my $args = shift;
+
+    # CreateUser in RT::Interface::Email doesn't account $RT::AutoCreate
+    # config option. Let's workaround it.
+
+    return unless $RT::AutoCreate && keys %$RT::AutoCreate;
+    return unless keys %$args; # no args - update
+    return unless (caller(4))[3] eq 'RT::Interface::Email::CreateUser';
+
+    my %tmp = %$RT::AutoCreate;
+    delete @tmp{qw(Name EmailAddress RealName Comments)};
+    %$args = (%$args, %$RT::AutoCreate);
 }
 
 1;
