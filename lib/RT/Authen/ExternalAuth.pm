@@ -15,12 +15,6 @@ our $VERSION = '0.09';
   It also allows for authenticating cookie information against an
   external database through the use of the RT-Authen-CookieAuth extension.
 
-=begin testing
-
-ok(require RT::Authen::ExternalAuth);
-
-=end testing
-
 =cut    
 
 use RT::Authen::ExternalAuth::LDAP;
